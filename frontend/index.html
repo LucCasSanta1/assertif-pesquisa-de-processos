@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radar CNPJ — Processos Arquivados (Trabalhista, Estadual e Federal)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-600/30">
+          ⚖️
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white">Radar Jurídico CNPJ — Processos Arquivados</h1>
+          <p class="text-xs text-slate-400">Auditoria Nacional CNJ (DataJud TPU + Comunica PJe/DJEN + Receita Federal)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/docs" target="_blank" class="text-xs font-medium px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          📄 Documentação da API (Swagger)
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <!-- Painel de Busca -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <form id="searchForm" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div class="md:col-span-5">
+            <label for="cnpjInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              CNPJ da Empresa *
+            </label>
+            <input
+              id="cnpjInput"
+              type="text"
+              required
+              maxlength="18"
+              placeholder="00.000.000/0001-91"
+              class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white mono text-base focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div class="md:col-span-4">
+            <label for="razaoInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              Razão Social (Opcional — detectada via CNPJ)
+            </label>
+            <input
+              id="razaoInput"
+              type="text"
+              placeholder="Preenchimento automático via BrasilAPI"
+              class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div class="md:col-span-3 flex flex-col justify-end">
+            <button
+              id="btnSubmit"
+              type="submit"
+              class="w-full py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2"
+            >
+              <span>🔍 Consultar Processos</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Opções avançadas colapsáveis -->
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800/80 text-xs text-slate-400">
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input id="demoMode" type="checkbox" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500" />
+              <span>Modo Demonstração</span>
+            </label>
+            <button type="button" id="toggleAdvanced" class="text-indigo-400 hover:text-indigo-300 underline">
+              + Números CNJ / Importar Base Excel (.xlsx)
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <span>Exemplos rápidos:</span>
+            <button type="button" onclick="preencherExemplo('08.803.452/0001-13', false)" class="px-2.5 py-1 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 mono font-semibold">
+              08.803.452/0001-13 (Sudati Painéis)
+            </button>
+            <button type="button" onclick="preencherExemplo('00.000.000/0001-91', false)" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 mono">
+              00.000.000/0001-91
+            </button>
+            <button type="button" onclick="preencherExemplo('00.000.000/0001-91', true)" class="px-2 py-1 rounded bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/50 text-indigo-300">
+              ⚡ Teste Demonstração
+            </button>
+          </div>
+        </div>
+
+        <div id="advancedBox" class="hidden pt-3 space-y-3 border-t border-slate-800/60">
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">📂 Importar Planilha de Acervo (.xlsx)</div>
+              <div class="text-[11px] text-slate-400">Carregue uma planilha (ex: Grupo Sudati 2.0.xlsx) para cruzar todos os processos históricos (2008–2026) com a busca ao vivo do CNJ.</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <input id="excelUploadInput" type="file" accept=".xlsx" class="text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500" />
+              <span id="uploadStatus" class="text-xs text-emerald-400 font-medium"></span>
+            </div>
+          </div>
+          <div>
+            <label for="cnjAdicionais" class="block text-xs font-medium text-slate-400 mb-1">
+              Números de Processos CNJ Adicionais (opcional, um por linha ou separados por vírgula para validar no DataJud):
+            </label>
+            <textarea
+              id="cnjAdicionais"
+              rows="2"
+              placeholder="Ex: 1001234-56.2022.5.02.0001, 1045678-12.2021.8.26.0100"
+              class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            ></textarea>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Estado de carregamento -->
+    <section id="loadingSection" class="hidden bg-slate-900/60 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+      <div class="inline-block w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <h3 class="text-base font-semibold text-white">Consultando bases públicas e analisando movimentos TPU no DataJud...</h3>
+      <p class="text-xs text-slate-400 max-w-xl mx-auto">
+        1. Validando CNPJ na Receita Federal &rarr; 2. Localizando processos nacionais no Comunica PJe/DJEN &rarr;
+        3. Verificando códigos de arquivamento (246, 245, 861, 22, 10966 vs 893/849) no DataJud CNJ.
+      </p>
+    </section>
+
+    <!-- Mensagem de erro -->
+    <section id="errorSection" class="hidden bg-red-950/50 border border-red-800/80 text-red-200 rounded-2xl p-5 text-sm"></section>
+
+    <!-- Resultados -->
+    <div id="resultsContainer" class="hidden space-y-6">
+      <!-- Cabeçalho da Empresa + Botão Excel -->
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <span id="empCnpj" class="px-2.5 py-1 rounded-md bg-slate-800 text-indigo-300 mono text-xs font-semibold"></span>
+            <span id="empSituacao" class="px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-medium"></span>
+            <span id="empUfMun" class="text-xs text-slate-400"></span>
+          </div>
+          <h2 id="empRazao" class="text-xl font-bold text-white"></h2>
+          <p id="empFontes" class="text-xs text-slate-400"></p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <a
+            id="btnDownloadExcel"
+            href="#"
+            class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center gap-2"
+          >
+            <span>📥 Baixar Planilha Excel (.xlsx)</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- Cards de Contagem Separada de Processos Arquivados -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total Arquivados -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-700/80 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Arquivados</span>
+            <span class="text-lg">📦</span>
+          </div>
+          <div id="countTotalArq" class="text-4xl font-extrabold text-white mt-2 mono">0</div>
+          <div id="subTotalGeral" class="text-xs text-slate-400 mt-2">de 0 processos analisados</div>
+        </div>
+
+        <!-- Trabalhista -->
+        <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Trabalhista (Arquivados)</span>
+            <span class="px-2 py-0.5 rounded text-[11px] bg-amber-500/10 text-amber-300 border border-amber-500/20">TRTs / TST</span>
+          </div>
+          <div id="countTrabalhista" class="text-4xl font-extrabold text-amber-400 mt-2 mono">0</div>
+          <div id="subTrabalhista" class="text-xs text-slate-400 mt-2">0 definitivos · 0 provisórios · 0 ativos</div>
+        </div>
+
+        <!-- Estadual -->
+        <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-sky-400">Estadual (Arquivados)</span>
+            <span class="px-2 py-0.5 rounded text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/20">TJs (J=8)</span>
+          </div>
+          <div id="countEstadual" class="text-4xl font-extrabold text-sky-400 mt-2 mono">0</div>
+          <div id="subEstadual" class="text-xs text-slate-400 mt-2">0 definitivos · 0 provisórios · 0 ativos</div>
+        </div>
+
+        <!-- Federal -->
+        <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Federal (Arquivados)</span>
+            <span class="px-2 py-0.5 rounded text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">TRFs (J=4)</span>
+          </div>
+          <div id="countFederal" class="text-4xl font-extrabold text-emerald-400 mt-2 mono">0</div>
+          <div id="subFederal" class="text-xs text-slate-400 mt-2">0 definitivos · 0 provisórios · 0 ativos</div>
+        </div>
+      </section>
+
+      <!-- Observações se houver -->
+      <div id="obsBox" class="hidden bg-indigo-950/40 border border-indigo-800/60 text-indigo-200 rounded-xl p-4 text-xs space-y-1"></div>
+
+      <!-- Tabela de Processos com Filtros por Esfera -->
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-2" id="filterTabs">
+            <button data-filter="ARQUIVADOS" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white">
+              Somente Arquivados
+            </button>
+            <button data-filter="Trabalhista" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300">
+              Trabalhista (Arquivados)
+            </button>
+            <button data-filter="Estadual" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-sky-300">
+              Estadual (Arquivados)
+            </button>
+            <button data-filter="Federal" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-emerald-300">
+              Federal (Arquivados)
+            </button>
+            <button data-filter="TODOS" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300">
+              Todos Analisados (Arquivados + Ativos)
+            </button>
+          </div>
+
+          <input
+            id="tableSearch"
+            type="text"
+            placeholder="Filtrar por número, tribunal, classe..."
+            class="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-64"
+          />
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-950/60">
+                <th class="py-3.5 px-4">Processo CNJ</th>
+                <th class="py-3.5 px-4">Esfera</th>
+                <th class="py-3.5 px-4">Tribunal</th>
+                <th class="py-3.5 px-4">Classe / Órgão Julgador</th>
+                <th class="py-3.5 px-4">Status de Arquivamento</th>
+                <th class="py-3.5 px-4">Último Movimento Relevante (TPU)</th>
+                <th class="py-3.5 px-4">Data Arquivamento</th>
+              </tr>
+            </thead>
+            <tbody id="processTableBody" class="divide-y divide-slate-800/70 text-xs"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    let currentData = null;
+    let activeFilter = 'ARQUIVADOS';
+
+    const cnpjInput = document.getElementById('cnpjInput');
+    cnpjInput.addEventListener('input', (e) => {
+      let v = e.target.value.replace(/\D/g, '').slice(0, 14);
+      if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5');
+      else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{1,4})/, '$1.$2.$3/$4');
+      else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
+      else if (v.length > 2) v = v.replace(/^(\d{2})(\d{1,3})/, '$1.$2');
+      e.target.value = v;
+    });
+
+    document.getElementById('toggleAdvanced').addEventListener('click', () => {
+      document.getElementById('advancedBox').classList.toggle('hidden');
+    });
+
+    document.getElementById('excelUploadInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById('uploadStatus');
+      statusEl.textContent = '⏳ Importando...';
+      const formData = new FormData();
+      formData.append('arquivo', file);
+      try {
+        const resp = await fetch('/api/v1/importar-planilha', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Erro ao importar planilha');
+        statusEl.textContent = `✅ ${data.processos_indexados} processos indexados!`;
+      } catch (err) {
+        statusEl.textContent = '❌ ' + err.message;
+      }
+    });
+
+    function preencherExemplo(cnpj, demo) {
+      cnpjInput.value = cnpj;
+      document.getElementById('demoMode').checked = demo;
+      document.getElementById('searchForm').requestSubmit();
+    }
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeFilter = btn.dataset.filter;
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          b.classList.remove('bg-indigo-600', 'text-white');
+          b.classList.add('bg-slate-800');
+        });
+        btn.classList.remove('bg-slate-800');
+        btn.classList.add('bg-indigo-600', 'text-white');
+        renderTable();
+      });
+    });
+
+    document.getElementById('tableSearch').addEventListener('input', renderTable);
+
+    function formatarData(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleDateString('pt-BR');
+      } catch {
+        return iso;
+      }
+    }
+
+    function badgeEsfera(esfera) {
+      if (esfera === 'Trabalhista') {
+        return '<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">Trabalhista</span>';
+      }
+      if (esfera === 'Estadual') {
+        return '<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30">Estadual</span>';
+      }
+      if (esfera === 'Federal') {
+        return '<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Federal</span>';
+      }
+      return `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-300">${esfera}</span>`;
+    }
+
+    function badgeStatus(proc) {
+      if (proc.arquivado) {
+        const cod = proc.codigo_movimento_arquivamento ? ` (TPU ${proc.codigo_movimento_arquivamento})` : '';
+        return `<span class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">📦 ${proc.status_detalhado}${cod}</span>`;
+      }
+      return `<span class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300">${proc.status_detalhado || 'Em Andamento'}</span>`;
+    }
+
+    function renderTable() {
+      if (!currentData) return;
+      const tbody = document.getElementById('processTableBody');
+      const term = (document.getElementById('tableSearch').value || '').toLowerCase().trim();
+
+      let lista = activeFilter === 'TODOS'
+        ? (currentData.todos_processos || [])
+        : (currentData.processos_arquivados || []);
+
+      if (activeFilter === 'Trabalhista' || activeFilter === 'Estadual' || activeFilter === 'Federal') {
+        lista = (currentData.processos_arquivados || []).filter(p => p.esfera === activeFilter);
+      }
+
+      if (term) {
+        lista = lista.filter(p =>
+          (p.numero_formatado || '').toLowerCase().includes(term) ||
+          (p.numero_processo || '').toLowerCase().includes(term) ||
+          (p.tribunal || '').toLowerCase().includes(term) ||
+          (p.classe_nome || '').toLowerCase().includes(term) ||
+          (p.orgao_julgador || '').toLowerCase().includes(term) ||
+          (p.ultimo_movimento_relevante || '').toLowerCase().includes(term)
+        );
+      }
+
+      if (!lista.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="py-10 text-center text-slate-400">
+              Nenhum processo encontrado para o filtro selecionado.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = lista.map(p => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="py-3.5 px-4 mono font-semibold text-white whitespace-nowrap">${p.numero_formatado || p.numero_processo}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap">${badgeEsfera(p.esfera)}</td>
+          <td class="py-3.5 px-4 font-semibold text-slate-200 whitespace-nowrap">${p.tribunal}${p.uf ? ` (${p.uf})` : ''}</td>
+          <td class="py-3.5 px-4">
+            <div class="font-medium text-slate-200">${p.classe_nome || 'Classe não informada'}</div>
+            <div class="text-[11px] text-slate-400">${p.orgao_julgador || '—'}</div>
+          </td>
+          <td class="py-3.5 px-4 whitespace-nowrap">${badgeStatus(p)}</td>
+          <td class="py-3.5 px-4 text-slate-300">${p.ultimo_movimento_relevante || '—'}</td>
+          <td class="py-3.5 px-4 mono text-slate-300 whitespace-nowrap">${formatarData(p.data_arquivamento || p.data_ultima_movimentacao)}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cnpj = cnpjInput.value.trim();
+      const razao = document.getElementById('razaoInput').value.trim() || null;
+      const demo = document.getElementById('demoMode').checked;
+      const rawAdicionais = document.getElementById('cnjAdicionais').value.trim();
+      const adicionais = rawAdicionais
+        ? rawAdicionais.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
+        : null;
+
+      document.getElementById('loadingSection').classList.remove('hidden');
+      document.getElementById('errorSection').classList.add('hidden');
+      document.getElementById('resultsContainer').classList.add('hidden');
+
+      try {
+        const resp = await fetch('/api/v1/consulta-cnpj', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cnpj,
+            razao_social: razao,
+            max_paginas: 8,
+            numeros_cnj_adicionais: adicionais,
+            modo_demonstracao: demo
+          })
+        });
+
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || 'Falha ao consultar CNPJ.');
+        }
+
+        currentData = data;
+        document.getElementById('empCnpj').textContent = data.empresa.cnpj_formatado;
+        document.getElementById('empRazao').textContent = data.empresa.razao_social;
+        document.getElementById('empSituacao').textContent = data.empresa.situacao_cadastral || 'ATIVA';
+        document.getElementById('empUfMun').textContent = [data.empresa.municipio, data.empresa.uf].filter(Boolean).join(' / ');
+        document.getElementById('empFontes').textContent = 'Fontes: ' + (data.fontes_consultadas || []).join(' • ');
+
+        document.getElementById('btnDownloadExcel').href = `/api/v1/jobs/${data.job_id}/excel`;
+
+        // Contagens principais
+        const c = data.contagem_arquivados;
+        document.getElementById('countTotalArq').textContent = c.total_arquivados;
+        document.getElementById('subTotalGeral').textContent = `de ${c.total_geral_analisados} processos analisados`;
+
+        document.getElementById('countTrabalhista').textContent = c.trabalhista;
+        document.getElementById('countEstadual').textContent = c.estadual;
+        document.getElementById('countFederal').textContent = c.federal;
+
+        const det = data.detalhamento_por_esfera || {};
+        const dTrab = det['Trabalhista'] || { arquivados_definitivo: 0, arquivados_provisorio: 0, ativos: 0 };
+        const dEst = det['Estadual'] || { arquivados_definitivo: 0, arquivados_provisorio: 0, ativos: 0 };
+        const dFed = det['Federal'] || { arquivados_definitivo: 0, arquivados_provisorio: 0, ativos: 0 };
+
+        document.getElementById('subTrabalhista').textContent =
+          `${dTrab.arquivados_definitivo} definitivos · ${dTrab.arquivados_provisorio} provisórios · ${dTrab.ativos} ativos`;
+        document.getElementById('subEstadual').textContent =
+          `${dEst.arquivados_definitivo} definitivos · ${dEst.arquivados_provisorio} provisórios · ${dEst.ativos} ativos`;
+        document.getElementById('subFederal').textContent =
+          `${dFed.arquivados_definitivo} definitivos · ${dFed.arquivados_provisorio} provisórios · ${dFed.ativos} ativos`;
+
+        const obsBox = document.getElementById('obsBox');
+        if (data.observacoes && data.observacoes.length) {
+          obsBox.innerHTML = data.observacoes.map(o => `<div>ℹ️ ${o}</div>`).join('');
+          obsBox.classList.remove('hidden');
+        } else {
+          obsBox.classList.add('hidden');
+        }
+
+        renderTable();
+        document.getElementById('resultsContainer').classList.remove('hidden');
+      } catch (err) {
+        const errSec = document.getElementById('errorSection');
+        errSec.textContent = '❌ ' + (err.message || 'Erro inesperado na consulta.');
+        errSec.classList.remove('hidden');
+      } finally {
+        document.getElementById('loadingSection').classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
