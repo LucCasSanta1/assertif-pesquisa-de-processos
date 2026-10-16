@@ -154,11 +154,15 @@ def _aplicar_source_datajud(processo: ProcessoJudicial, source: dict) -> Process
 
     arquivado, status, cod_mov, desc_mov, data_arq = classificar_arquivamento(movimentos)
 
+    movs_ordenados = sorted(movimentos, key=lambda m: m.data_hora) if movimentos else []
     ultima_movimentacao = (
-        max((m.data_hora for m in movimentos), default=processo.data_ultima_movimentacao)
-        if movimentos
+        movs_ordenados[-1].data_hora
+        if movs_ordenados
         else processo.data_ultima_movimentacao
     )
+    if not desc_mov and movs_ordenados:
+        ult = movs_ordenados[-1]
+        desc_mov = f"{ult.nome} (Cód. {ult.codigo})" if ult.nome else f"Movimento TPU {ult.codigo}"
 
     return processo.model_copy(
         update={
@@ -200,11 +204,15 @@ async def _enriquecer_chunk_tribunal(
         "Content-Type": "application/json",
     }
     numeros_lista = list(mapa_num.keys())
+    es_size = max(100, len(numeros_lista) * 4)
     query = {
-        "size": len(numeros_lista),
+        "size": es_size,
         "query": {
-            "terms": {
-                "numeroProcesso": numeros_lista,
+            "bool": {
+                "should": [
+                    {"match": {"numeroProcesso": n}} for n in numeros_lista
+                ],
+                "minimum_should_match": 1,
             }
         },
     }
@@ -215,27 +223,20 @@ async def _enriquecer_chunk_tribunal(
             hits = []
             if resp.status_code == 200:
                 hits = resp.json().get("hits", {}).get("hits", [])
-            if not hits:
-                query_match = {
-                    "size": len(numeros_lista),
-                    "query": {
-                        "bool": {
-                            "should": [
-                                {"match": {"numeroProcesso": n}} for n in numeros_lista
-                            ],
-                            "minimum_should_match": 1,
-                        }
-                    },
-                }
-                resp2 = await client.post(endpoint, json=query_match, headers=headers)
-                if resp2.status_code == 200:
-                    hits = resp2.json().get("hits", {}).get("hits", [])
 
+            # Agrupa múltiplos hits do mesmo processo (ex: G1 e G2 no mesmo tribunal)
+            sources_por_num: dict[str, list[dict]] = {}
             for h in hits:
                 src = h.get("_source") or {}
                 num_hit = str(src.get("numeroProcesso") or "").strip()
                 if num_hit in mapa_num:
-                    mapa_num[num_hit] = _aplicar_source_datajud(mapa_num[num_hit], src)
+                    sources_por_num.setdefault(num_hit, []).append(src)
+
+            for num_hit, lista_src in sources_por_num.items():
+                proc_atual = mapa_num[num_hit]
+                for src in lista_src:
+                    proc_atual = _aplicar_source_datajud(proc_atual, src)
+                mapa_num[num_hit] = proc_atual
         except Exception:
             pass
 
@@ -245,7 +246,7 @@ async def _enriquecer_chunk_tribunal(
 async def enriquecer_lote_datajud(
     processos: list[ProcessoJudicial],
     max_concurrency: int = 10,
-    batch_size: int = 25,
+    batch_size: int = 20,
 ) -> list[ProcessoJudicial]:
     """
     Enriquece uma lista de processos via DataJud agrupando por tribunal em lotes
